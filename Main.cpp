@@ -15,6 +15,7 @@
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 #define ASPECT_RATIO (16.0f/9.0f)
+#define MAX_DEPTH 50
 
 void ErrorHandleShader(GLuint& shader, GLuint& program)
 {
@@ -134,11 +135,15 @@ int main()
     glUseProgram(programID);
 
     glm::mat4 ortho = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, -1.0f, 1.0f);
+    //glm::mat4 persp = glm::perspective(45.0f, ASPECT_RATIO, -1.0f, 1.0f);
 
     GLuint loc = glGetUniformLocation(programID, "u_ProjectionMatrix");
     glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(ortho));
     loc = glGetUniformLocation(programID, "u_AspectRatio");
     glUniform1f(loc, ASPECT_RATIO);
+    loc = glGetUniformLocation(programID, "u_MaxDepth");
+    glUniform1i(loc, MAX_DEPTH);
+    GLuint time = glGetUniformLocation(programID, "u_Time");
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
@@ -152,13 +157,15 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
+        glUniform1f(time, (float)glfwGetTime());
+
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // ImGui::ShowDemoWindow();
+        //ImGui::ShowDemoWindow();
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
