@@ -11,11 +11,25 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 #define ASPECT_RATIO (16.0f/9.0f)
-#define MAX_DEPTH 50
+#define MAX_DEPTH 2
+
+void GLAPIENTRY ErrorHandleOpenGLCallback( GLenum source,
+                 GLenum type,
+                 GLuint id,
+                 GLenum severity,
+                 GLsizei length,
+                 const GLchar* message,
+                 const void* userParam )
+{
+  fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+           ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
+            type, severity, message );
+}
 
 void ErrorHandleShader(GLuint& shader, GLuint& program)
 {
@@ -33,6 +47,31 @@ void ErrorHandleShader(GLuint& shader, GLuint& program)
         glDeleteShader(shader);
         glDeleteProgram(program);
     }
+}
+
+int ErrorHandleShaderLink(GLuint& program)
+{
+    GLint isLinked = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &isLinked);
+    if (isLinked == GL_FALSE)
+    {
+        GLint maxLength = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+        // The maxLength includes the NULL character
+        std::string infoLog;
+        infoLog.resize(maxLength);
+        glGetProgramInfoLog(program, maxLength, &maxLength, &infoLog[0]);
+
+        // The program is useless now. So delete it.
+        glDeleteProgram(program);
+
+        std::cout << infoLog << std::endl;
+
+        // Exit with failure.
+        return 0;
+    }
+    return 1;
 }
 
 int main()
@@ -63,6 +102,9 @@ int main()
     {
         glViewport(0, 0, width, height);
     });
+
+    glEnable              ( GL_DEBUG_OUTPUT );
+    glDebugMessageCallback( ErrorHandleOpenGLCallback, 0 );
 
     const int NUM_VERTICES = 8;
     float vertices[NUM_VERTICES] = {
@@ -131,6 +173,7 @@ int main()
     glDeleteShader(fragmentShaderObj);
 
     glLinkProgram(programID);
+    if(!ErrorHandleShaderLink(programID)) { return -1; }
     glValidateProgram(programID);
     glUseProgram(programID);
 

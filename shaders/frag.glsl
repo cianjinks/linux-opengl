@@ -1,47 +1,45 @@
 #version 430 core
+#define PI 3.14159265359
 
 out vec4 FragColor;
 in vec3 v_Pos;
+
 uniform float u_AspectRatio;
 uniform float u_Time;
 uniform int u_MaxDepth;
 
+
+const float infinity = 1.0f / 0.0f;
+
 // Random Numbers
-uint hash( uint x ) {
-    x += ( x << 10u );
-    x ^= ( x >>  6u );
-    x += ( x <<  3u );
-    x ^= ( x >> 11u );
-    x += ( x << 15u );
-    return x;
+/**
+ * http://www.jcgt.org/published/0009/03/02/
+ */
+uvec3 pcg3d(uvec3 v) {
+  v = v * 1664525u + 1013904223u;
+  v.x += v.y * v.z;
+  v.y += v.z * v.x;
+  v.z += v.x * v.y;
+  v ^= v >> 16u;
+  v.x += v.y * v.z;
+  v.y += v.z * v.x;
+  v.z += v.x * v.y;
+  return v;
 }
 
-float randomfloat(float f) {
-    const uint mantissaMask = 0x007FFFFFu;
-    const uint one          = 0x3F800000u;
-   
-    uint h = hash(floatBitsToUint(f));
-    h &= mantissaMask;
-    h |= one;
-    
-    float  r2 = uintBitsToFloat(h);
-    return r2 - 1.0;
+vec3 random3(vec3 f) {
+  return uintBitsToFloat((pcg3d(floatBitsToUint(f)) & 0x007FFFFFu) | 0x3F800000u) - 1.0;
 }
 
-vec3 random()
-{
-    return (2*vec3(randomfloat(u_Time), randomfloat(u_Time+1), randomfloat(u_Time+2)))-1;
-}
-
-vec3 randomInUnitSphere()
-{
-    while(true)
-    {
-        vec3 p = random();
-        float plength = length(p);
-        if (plength*plength >= 1) { continue; }
-        return p;
-    }
+vec3 randomSpherePoint(vec3 rand) {
+  float ang1 = (rand.x + 1.0) * PI; // [-1..1) -> [0..2*PI)
+  float u = rand.y; // [-1..1), cos and acos(2v-1) cancel each other out, so we arrive at [-1..1)
+  float u2 = u * u;
+  float sqrt1MinusU2 = sqrt(1.0 - u2);
+  float x = sqrt1MinusU2 * cos(ang1);
+  float y = sqrt1MinusU2 * sin(ang1);
+  float z = u;
+  return vec3(x, y, z);
 }
 ///////////////////////
 
@@ -80,7 +78,7 @@ bool hitAABB(vec3 position, float scale, vec3 rayOrigin, vec3 invRaydir)
     return maxComponent <= minComponent;
 }
 
-bool hit_sphere(vec3 center, float radius, Ray ray, inout HitRecord rec) {
+bool hit_sphere(vec3 center, float radius, float tmin, float tmax, Ray ray, inout HitRecord rec) {
     vec3 oc = ray.origin - center;
     float dirlength = length(ray.direction);
     float a = dirlength * dirlength;
@@ -92,7 +90,17 @@ bool hit_sphere(vec3 center, float radius, Ray ray, inout HitRecord rec) {
     if(discriminant < 0) { return false; }
     
     float sqrtd = sqrt(discriminant);
-    rec.t = (-b - sqrtd) / a;
+
+    float root = (-b - sqrtd) / a;
+    if (root < tmin || tmax < root) {
+        root = (-b + sqrtd) / a;
+        if (root < tmin || tmax < root)
+        {
+            return false;
+        }
+    }
+
+    rec.t = root;
     rec.p = ray.origin + rec.t*ray.direction;
     vec3 outward_normal = (rec.p - center) / radius;
     rec.set_face_normal(ray, outward_normal);
@@ -100,7 +108,7 @@ bool hit_sphere(vec3 center, float radius, Ray ray, inout HitRecord rec) {
     return true;
 }
 
-vec3 calculateColor(Ray ray, int depth)
+vec3 calculateColor(Ray ray)
 {
     // vec3 position = vec3(0.0f, 0.0f, -1.0f);
     // float scale = 0.5f;
@@ -108,22 +116,16 @@ vec3 calculateColor(Ray ray, int depth)
     // {
     //     return vec3(0.0f, 1.0f, 0.0f);
     // }
-    if(depth <= 0)
-    {
-        return vec3(0.0f);
-    }
+    HitRecord rec;
 
     // Small sphere
     vec3 center = vec3(0.0f, 0.0f, -1.0f);
     float radius = 0.5f;
-    HitRecord rec;
-    if(hit_sphere(center, radius, ray, rec))    
+    if(hit_sphere(center, radius, 0, infinity, ray, rec))    
     {
         //vec3 pos = ray.origin + t*ray.direction; // Ray's hitpoint on edge of sphere
         //vec3 n = normalize(pos - center); // Invert the direction and normalize (this is the normal itself)
         //return 0.5*(n+1); // Move between 0.0f and 1.0f for colors
-        vec3 target = rec.p + rec.normal + randomInUnitSphere();
-        //return 0.5 * calculateColor(Ray(rec.p, target - rec.p), depth-1);
         return 0.5 * (rec.normal + vec3(1.0f));
     }
 
@@ -143,11 +145,42 @@ vec3 calculateColor(Ray ray, int depth)
     return color;
 }
 
+vec3 calculateTraceColor(Ray ray)
+{
+    vec3 centers[2] = {vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, -10.5f, -1.0f)};
+    float radaii[2] = {0.5f, 10.0f};
+
+    // Ray trace
+    Ray newray = ray;
+    float frac = 1.0f;
+    int bounce;
+    for(bounce = u_MaxDepth; bounce > 0; bounce--)
+    {
+        HitRecord rec;
+        if(hit_sphere(centers[0], radaii[0], 0, infinity, ray, rec) || hit_sphere(centers[1], radaii[1], 0, infinity, ray, rec))    
+        {
+            newray.origin = rec.p;
+            newray.direction = rec.normal + randomSpherePoint(random3(vec3(v_Pos)));
+            frac = 0.5f * frac;
+        }
+        else
+        {
+            break;
+        }
+    }
+    //if(bounce == 0) { return vec3(0.0f, 1.0f, 0.0f); }
+
+    vec3 unit = normalize(newray.direction);
+    float t = 0.5*(unit.y + 1.0);
+    vec3 color = mix(vec3(1.0, 1.0, 1.0), vec3(0.1, 0.2, 1.0), t);
+    return frac*color;
+}
+
 void main()
 {
     Ray ray;
     ray.origin = vec3(0.0f);
     ray.direction = vec3(v_Pos.x*u_AspectRatio, v_Pos.y, v_Pos.z) - vec3(0.0f, 0.0f, 1.0f);
-    FragColor = vec4(calculateColor(ray, u_MaxDepth), 1.0f);
+    FragColor = vec4(calculateTraceColor(ray), 1.0f);
     //FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
 }
