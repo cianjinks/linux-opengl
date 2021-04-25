@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <time.h>
 
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
@@ -186,7 +187,14 @@ int main()
     glUniform1f(loc, ASPECT_RATIO);
     loc = glGetUniformLocation(programID, "u_MaxDepth");
     glUniform1i(loc, MAX_DEPTH);
-    GLuint time = glGetUniformLocation(programID, "u_Time");
+    loc = glGetUniformLocation(programID, "u_Random");
+    GLuint glfwTime = glGetUniformLocation(programID, "u_Time");
+
+    srand(time(0));
+    float r1 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+    float r2 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+    float r3 = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+    glUniform3f(loc, r1, r2, r3);
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
@@ -200,7 +208,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-        glUniform1f(time, (float)glfwGetTime());
+        glUniform1f(glfwTime, (float)glfwGetTime());
 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 

@@ -7,7 +7,7 @@ in vec3 v_Pos;
 uniform float u_AspectRatio;
 uniform float u_Time;
 uniform int u_MaxDepth;
-
+uniform vec3 u_Random;
 
 const float infinity = 1.0f / 0.0f;
 
@@ -108,47 +108,11 @@ bool hit_sphere(vec3 center, float radius, float tmin, float tmax, Ray ray, inou
     return true;
 }
 
-vec3 calculateColor(Ray ray)
-{
-    // vec3 position = vec3(0.0f, 0.0f, -1.0f);
-    // float scale = 0.5f;
-    // if(hitAABB(position, scale, ray.origin, 1.0f/ray.direction))
-    // {
-    //     return vec3(0.0f, 1.0f, 0.0f);
-    // }
-    HitRecord rec;
-
-    // Small sphere
-    vec3 center = vec3(0.0f, 0.0f, -1.0f);
-    float radius = 0.5f;
-    if(hit_sphere(center, radius, 0, infinity, ray, rec))    
-    {
-        //vec3 pos = ray.origin + t*ray.direction; // Ray's hitpoint on edge of sphere
-        //vec3 n = normalize(pos - center); // Invert the direction and normalize (this is the normal itself)
-        //return 0.5*(n+1); // Move between 0.0f and 1.0f for colors
-        return 0.5 * (rec.normal + vec3(1.0f));
-    }
-
-    // Large floor sphere
-    // center = vec3(0.0f, -100.5f, -1.0f);
-    // t = hit_sphere(center, 100.0f, ray);
-    // if(t > 0.0f)    
-    // {
-    //     vec3 pos = ray.origin + t*ray.direction;
-    //     vec3 n = normalize(pos - center); 
-    //     return 0.5*(n+1);
-    // }
-
-    vec3 unit = normalize(ray.direction);
-    float t = 0.5*(unit.y + 1.0);
-    vec3 color = mix(vec3(1.0, 1.0, 1.0), vec3(0.1, 0.2, 1.0), t);
-    return color;
-}
-
 vec3 calculateTraceColor(Ray ray)
 {
-    vec3 centers[2] = {vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, -10.5f, -1.0f)};
-    float radaii[2] = {0.5f, 10.0f};
+    const int numSpheres = 2;
+    vec3 centers[numSpheres] = {vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, -100.5f, -1.0f)};
+    float radaii[numSpheres] = {0.5f, 100.0f};
 
     // Ray trace
     Ray newray = ray;
@@ -157,10 +121,23 @@ vec3 calculateTraceColor(Ray ray)
     for(bounce = u_MaxDepth; bounce > 0; bounce--)
     {
         HitRecord rec;
-        if(hit_sphere(centers[0], radaii[0], 0, infinity, ray, rec) || hit_sphere(centers[1], radaii[1], 0, infinity, ray, rec))    
+        HitRecord temprec;
+        bool hitAnything = false;
+        float closest = infinity;
+        for(int i = 0; i < numSpheres; i++)
+        {
+            if(hit_sphere(centers[i], radaii[i], 0, closest, newray, temprec))    
+            {
+                hitAnything = true;
+                closest = temprec.t;
+                rec = temprec;
+            }
+        }
+
+        if(hitAnything)
         {
             newray.origin = rec.p;
-            newray.direction = rec.normal + randomSpherePoint(random3(vec3(v_Pos)));
+            newray.direction = rec.normal + randomSpherePoint(u_Random);
             frac = 0.5f * frac;
         }
         else
@@ -168,12 +145,13 @@ vec3 calculateTraceColor(Ray ray)
             break;
         }
     }
+    //return 0.5*vec3(bounce+1);
     //if(bounce == 0) { return vec3(0.0f, 1.0f, 0.0f); }
 
     vec3 unit = normalize(newray.direction);
     float t = 0.5*(unit.y + 1.0);
-    vec3 color = mix(vec3(1.0, 1.0, 1.0), vec3(0.1, 0.2, 1.0), t);
-    return frac*color;
+    vec3 color = mix(vec3(1.0, 1.0, 1.0), vec3(0.5, 0.7, 1.0), t);
+    return sqrt(frac*color);
 }
 
 void main()
@@ -184,3 +162,40 @@ void main()
     FragColor = vec4(calculateTraceColor(ray), 1.0f);
     //FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
 }
+
+// vec3 calculateColor(Ray ray)
+// {
+//     // vec3 position = vec3(0.0f, 0.0f, -1.0f);
+//     // float scale = 0.5f;
+//     // if(hitAABB(position, scale, ray.origin, 1.0f/ray.direction))
+//     // {
+//     //     return vec3(0.0f, 1.0f, 0.0f);
+//     // }
+//     HitRecord rec;
+
+//     // Small sphere
+//     vec3 center = vec3(0.0f, 0.0f, -1.0f);
+//     float radius = 0.5f;
+//     if(hit_sphere(center, radius, 0, infinity, ray, rec))    
+//     {
+//         //vec3 pos = ray.origin + t*ray.direction; // Ray's hitpoint on edge of sphere
+//         //vec3 n = normalize(pos - center); // Invert the direction and normalize (this is the normal itself)
+//         //return 0.5*(n+1); // Move between 0.0f and 1.0f for colors
+//         return 0.5 * (rec.normal + vec3(1.0f));
+//     }
+
+//     // Large floor sphere
+//     // center = vec3(0.0f, -100.5f, -1.0f);
+//     // t = hit_sphere(center, 100.0f, ray);
+//     // if(t > 0.0f)    
+//     // {
+//     //     vec3 pos = ray.origin + t*ray.direction;
+//     //     vec3 n = normalize(pos - center); 
+//     //     return 0.5*(n+1);
+//     // }
+
+//     vec3 unit = normalize(ray.direction);
+//     float t = 0.5*(unit.y + 1.0);
+//     vec3 color = mix(vec3(1.0, 1.0, 1.0), vec3(0.1, 0.2, 1.0), t);
+//     return color;
+// }
