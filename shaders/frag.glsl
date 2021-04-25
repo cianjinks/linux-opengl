@@ -2,6 +2,7 @@
 
 out vec4 FragColor;
 in vec3 v_Pos;
+uniform float u_AspectRatio;
 
 struct Ray
 {
@@ -10,7 +11,7 @@ struct Ray
 };
 
 // http://jcgt.org/published/0007/03/04/
-bool slabs(vec3 position, float scale, vec3 rayOrigin, vec3 invRaydir) 
+bool hitAABB(vec3 position, float scale, vec3 rayOrigin, vec3 invRaydir) 
 {
     vec3 bmin = position - scale;
 	vec3 bmax = position + scale;
@@ -36,16 +37,16 @@ bool hit_sphere(vec3 center, float radius, Ray ray) {
 
 vec4 calculateColor(Ray ray)
 {
-    vec3 position = vec3(0.0f);
-    float scale = 0.1f;
-    // if(slabs(position, scale, ray.origin, 1.0f/ray.direction))
-    // {
-    //     return vec4(0.0f, 1.0f, 0.0f, 1.0f);
-    // }
-    if (hit_sphere(vec3(0.0f, 0.0f, -1.0f), 0.5f, ray))
+    vec3 position = vec3(0.0f, 0.0f, -1.0f);
+    float scale = 0.5f;
+    if(hitAABB(position, scale, ray.origin, 1.0f/ray.direction))
     {
         return vec4(0.0f, 1.0f, 0.0f, 1.0f);
     }
+    // if (hit_sphere(vec3(0.0f, 0.0f, -1.0f), 0.8f, ray))
+    // {
+    //     return vec4(0.0f, 1.0f, 0.0f, 1.0f);
+    // }
     vec3 unit = normalize(ray.direction);
     float t = 0.5*(unit.y + 1.0);
     vec3 color = mix(vec3(1.0, 1.0, 1.0), vec3(0.1, 0.2, 1.0), t);
@@ -56,7 +57,7 @@ void main()
 {
     Ray ray;
     ray.origin = vec3(0.0f);
-    ray.direction = v_Pos - vec3(0.0f, 0.0f, 1.0f);
+    ray.direction = vec3(v_Pos.x*u_AspectRatio, v_Pos.y, v_Pos.z) - vec3(0.0f, 0.0f, 1.0f);
     FragColor = calculateColor(ray);
     //FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
 }

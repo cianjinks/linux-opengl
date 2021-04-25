@@ -133,10 +133,12 @@ int main()
     glValidateProgram(programID);
     glUseProgram(programID);
 
-    glm::mat4 ortho = glm::ortho(-2.0f * (ASPECT_RATIO), 2.0f * (ASPECT_RATIO), -2.0f, 2.0f, -1.0f, 1.0f);
+    glm::mat4 ortho = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, -1.0f, 1.0f);
 
     GLuint loc = glGetUniformLocation(programID, "u_ProjectionMatrix");
     glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(ortho));
+    loc = glGetUniformLocation(programID, "u_AspectRatio");
+    glUniform1f(loc, ASPECT_RATIO);
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
